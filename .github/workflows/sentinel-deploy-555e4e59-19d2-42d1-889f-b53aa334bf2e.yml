@@ -1,0 +1,94 @@
+name: Deploy Content to soc-wkc [555e4e59-19d2-42d1-889f-b53aa334bf2e]
+# Note: This workflow will deploy everything in the root directory.
+# To deploy content only from a specific path (for example SentinelContent):
+#   1. Add the target path to the "paths" property like such
+#    paths:
+#    - 'SentinelContent/**'
+#    - '!.github/workflows/**'
+#    - '.github/workflows/sentinel-deploy-555e4e59-19d2-42d1-889f-b53aa334bf2e.yml'
+#   2. Append the path to the directory environment variable below
+#       directory: '${{ github.workspace }}/SentinelContent'
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+    - '**'
+    - '!.github/workflows/**'  # this filter prevents other workflow changes from triggering this workflow
+    - '.github/workflows/sentinel-deploy-555e4e59-19d2-42d1-889f-b53aa334bf2e.yml'
+
+jobs:
+  deploy-content:
+    runs-on: windows-latest
+    env:
+      resourceGroupName: 'rg1-dnd-amrit'
+      workspaceName: 'soc-wkc'
+      workspaceId: '0dd74b7f-d9a2-4120-8c23-c209830893df'
+      directory: '${{ github.workspace }}'
+      cloudEnv: 'AzureCloud'
+      contentTypes: 'AnalyticsRule,AutomationRule,HuntingQuery,Parser,Playbook,Workbook'
+      branch: 'main'
+      sourceControlId: '555e4e59-19d2-42d1-889f-b53aa334bf2e'
+      rootDirectory: '${{ github.workspace }}'
+      githubAuthToken: ${{ secrets.GITHUB_TOKEN }}
+      smartDeployment: 'true'
+    permissions:
+      contents: write
+      id-token: write # Require write permission to Fetch an OIDC token.
+
+    steps:
+    - name: Login to Azure (Attempt 1)
+      continue-on-error: true
+      id: login1
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_SENTINEL_CLIENTID_555e4e5919d242d1889fb53aa334bf2e }}
+        tenant-id: ${{ secrets.AZURE_SENTINEL_TENANTID_555e4e5919d242d1889fb53aa334bf2e }}
+        subscription-id: ${{ secrets.AZURE_SENTINEL_SUBSCRIPTIONID_555e4e5919d242d1889fb53aa334bf2e }}
+        environment: 'AzureCloud'
+        audience: api://AzureADTokenExchange
+        enable-AzPSSession: true
+
+    - name: Wait 30 seconds if login attempt 1 failed
+      if: ${{ steps.login1.outcome=='failure' }}
+      run: powershell Start-Sleep -s 30
+
+    - name: Login to Azure (Attempt 2)
+      continue-on-error: true
+      id: login2
+      uses: azure/login@v2
+      if: ${{ steps.login1.outcome=='failure' }}
+      with:
+        client-id: ${{ secrets.AZURE_SENTINEL_CLIENTID_555e4e5919d242d1889fb53aa334bf2e }}
+        tenant-id: ${{ secrets.AZURE_SENTINEL_TENANTID_555e4e5919d242d1889fb53aa334bf2e }}
+        subscription-id: ${{ secrets.AZURE_SENTINEL_SUBSCRIPTIONID_555e4e5919d242d1889fb53aa334bf2e }}
+        environment: 'AzureCloud'
+        audience: api://AzureADTokenExchange
+        enable-AzPSSession: true
+
+    - name: Wait 30 seconds if login attempt 2 failed
+      if: ${{ steps.login2.outcome=='failure' }}
+      run: powershell Start-Sleep -s 30
+
+    - name: Login to Azure (Attempt 3)
+      continue-on-error: false
+      id: login3
+      uses: azure/login@v2
+      if: ${{ steps.login2.outcome=='failure'  }}
+      with:
+        client-id: ${{ secrets.AZURE_SENTINEL_CLIENTID_555e4e5919d242d1889fb53aa334bf2e }}
+        tenant-id: ${{ secrets.AZURE_SENTINEL_TENANTID_555e4e5919d242d1889fb53aa334bf2e }}
+        subscription-id: ${{ secrets.AZURE_SENTINEL_SUBSCRIPTIONID_555e4e5919d242d1889fb53aa334bf2e }}
+        environment: 'AzureCloud'
+        audience: api://AzureADTokenExchange
+        enable-AzPSSession: true
+
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Deploy Content to Microsoft Sentinel
+      uses: azure/powershell@v2
+      with:
+        azPSVersion: 'latest'
+        inlineScript: |
+          ${{ github.workspace }}//.github/workflows/azure-sentinel-deploy-555e4e59-19d2-42d1-889f-b53aa334bf2e.ps1
